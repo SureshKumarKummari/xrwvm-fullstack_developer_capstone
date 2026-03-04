@@ -1,15 +1,20 @@
-from django.shortcuts import render, get_object_or_404, redirect
-from django.http import JsonResponse
+# Uncomment the required imports before adding the code
+
+from django.shortcuts import render
+from django.http import HttpResponseRedirect, HttpResponse
 from django.contrib.auth.models import User
-from django.contrib.auth import login, logout, authenticate
-from django.views.decorators.csrf import csrf_exempt
+from django.shortcuts import get_object_or_404, render, redirect
+from django.contrib.auth import logout
+from django.contrib import messages
 from datetime import datetime
-import json
+
+from django.http import JsonResponse
+from django.contrib.auth import login, authenticate
 import logging
+import json
+from django.views.decorators.csrf import csrf_exempt
 
-from .models import CarMake, CarModel
-from .restapis import get_request, post_review
-
+# Get an instance of a logger
 logger = logging.getLogger(__name__)
 
 
@@ -26,13 +31,15 @@ def login_user(request):
 
     user = authenticate(username=username, password=password)
 
-    response = {"userName": username}
+    data = {"userName": username}
 
     if user is not None:
-        login(request, user)
-        response = {"userName": username, "status": "Authenticated"}
 
-    return JsonResponse(response)
+        login(request, user)
+
+        data = {"userName": username, "status": "Authenticated"}
+
+    return JsonResponse(data)
 
 
 # -----------------------------
@@ -54,6 +61,9 @@ def logout_request(request):
 @csrf_exempt
 def registration(request):
 
+    context = {}
+
+    # Load JSON data from request body
     data = json.loads(request.body)
 
     username = data['userName']
@@ -62,92 +72,40 @@ def registration(request):
     last_name = data['lastName']
     email = data['email']
 
-    try:
-        user = User.objects.get(username=username)
+    username_exist = False
 
-        return JsonResponse({"userName": username, "error": "Already Registered"})
+    try:
+
+        # Check if username already exists
+        User.objects.get(username=username)
+
+        username_exist = True
 
     except:
 
+        logger.debug("{} is new user".format(username))
+
+    # If user does not exist
+    if not username_exist:
+
+        # Create new user
         user = User.objects.create_user(
             username=username,
-            password=password,
-            email=email,
             first_name=first_name,
-            last_name=last_name
+            last_name=last_name,
+            password=password,
+            email=email
         )
 
+        # Login the user
         login(request, user)
 
-        return JsonResponse({"userName": username})
+        data = {"userName": username, "status": "Authenticated"}
 
+        return JsonResponse(data)
 
-# -----------------------------
-# GET DEALERSHIPS
-# -----------------------------
-def get_dealerships(request):
+    else:
 
-    url = "http://127.0.0.1:3030/api/dealership"
+        data = {"userName": username, "error": "Already Registered"}
 
-    dealerships = get_request(url)
-
-    context = {"dealerships": dealerships}
-
-    return JsonResponse(context)
-
-
-# -----------------------------
-# DEALER REVIEWS
-# -----------------------------
-def get_dealer_reviews(request, dealer_id):
-
-    url = "http://127.0.0.1:3030/api/reviews"
-
-    reviews = get_request(url, dealerId=dealer_id)
-
-    context = {"reviews": reviews}
-
-    return JsonResponse(context)
-
-
-# -----------------------------
-# DEALER DETAILS
-# -----------------------------
-def get_dealer_details(request, dealer_id):
-
-    url = "http://127.0.0.1:3030/api/dealership"
-
-    dealership = get_request(url, id=dealer_id)
-
-    return JsonResponse({"dealer": dealership})
-
-
-# -----------------------------
-# ADD REVIEW
-# -----------------------------
-@csrf_exempt
-def add_review(request):
-
-    if request.method == "POST":
-
-        data = json.loads(request.body)
-
-        review = {}
-
-        review["name"] = data["name"]
-        review["dealership"] = data["dealership"]
-        review["review"] = data["review"]
-        review["purchase"] = data["purchase"]
-
-        if data["purchase"]:
-
-            review["purchase_date"] = data["purchase_date"]
-            review["car_make"] = data["car_make"]
-            review["car_model"] = data["car_model"]
-            review["car_year"] = data["car_year"]
-
-        review["review_time"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-        response = post_review(review)
-
-        return JsonResponse(response)
+        return JsonResponse(data)
