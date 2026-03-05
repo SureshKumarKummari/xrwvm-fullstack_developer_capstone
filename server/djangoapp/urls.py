@@ -17,6 +17,8 @@ urlpatterns = [
     # path for registration
     path(route='register', view=views.registration, name='register'),
 
+    path(route='get_cars', view=views.get_cars, name='getcars'),
+
     # path for dealer reviews view
     # path('reviews/<int:dealer_id>/', views.get_dealer_reviews, name='dealer_reviews'),
 
