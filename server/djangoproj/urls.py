@@ -19,6 +19,8 @@ urlpatterns = [
 
     # Backend APIs
     path('djangoapp/', include('djangoapp.urls')),
+    path('dealers/', TemplateView.as_view(template_name="index.html")),
+
 
     # Home page
     path('', TemplateView.as_view(template_name="Home.html")),
