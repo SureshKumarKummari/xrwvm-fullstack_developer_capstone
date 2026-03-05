@@ -13,14 +13,17 @@ from django.contrib.auth import login, authenticate
 import logging
 import json
 from django.views.decorators.csrf import csrf_exempt
+
 from .models import CarMake, CarModel
 from .populate import initiate
+from .restapis import get_request, analyze_review_sentiments
 
-from django.http import JsonResponse
-
+# ---------------------------------
+# GET CARS
+# ---------------------------------
 def get_cars(request):
+
     count = CarMake.objects.filter().count()
-    print(count)
 
     if(count == 0):
         initiate()
@@ -28,7 +31,9 @@ def get_cars(request):
     car_models = CarModel.objects.select_related('car_make')
 
     cars = []
+
     for car_model in car_models:
+
         cars.append({
             "CarModel": car_model.name,
             "CarMake": car_model.car_make.name
@@ -36,13 +41,14 @@ def get_cars(request):
 
     return JsonResponse({"CarModels": cars})
 
+
 # Get an instance of a logger
 logger = logging.getLogger(__name__)
 
 
-# -----------------------------
+# ---------------------------------
 # LOGIN VIEW
-# -----------------------------
+# ---------------------------------
 @csrf_exempt
 def login_user(request):
 
@@ -64,9 +70,9 @@ def login_user(request):
     return JsonResponse(data)
 
 
-# -----------------------------
+# ---------------------------------
 # LOGOUT VIEW
-# -----------------------------
+# ---------------------------------
 @csrf_exempt
 def logout_request(request):
 
@@ -77,15 +83,14 @@ def logout_request(request):
     return JsonResponse(data)
 
 
-# -----------------------------
+# ---------------------------------
 # REGISTRATION VIEW
-# -----------------------------
+# ---------------------------------
 @csrf_exempt
 def registration(request):
 
     context = {}
 
-    # Load JSON data from request body
     data = json.loads(request.body)
 
     username = data['userName']
@@ -98,7 +103,6 @@ def registration(request):
 
     try:
 
-        # Check if username already exists
         User.objects.get(username=username)
 
         username_exist = True
@@ -107,10 +111,8 @@ def registration(request):
 
         logger.debug("{} is new user".format(username))
 
-    # If user does not exist
     if not username_exist:
 
-        # Create new user
         user = User.objects.create_user(
             username=username,
             first_name=first_name,
@@ -119,7 +121,6 @@ def registration(request):
             email=email
         )
 
-        # Login the user
         login(request, user)
 
         data = {"userName": username, "status": "Authenticated"}
@@ -131,3 +132,78 @@ def registration(request):
         data = {"userName": username, "error": "Already Registered"}
 
         return JsonResponse(data)
+
+
+# ---------------------------------
+# GET DEALERSHIPS
+# ---------------------------------
+def get_dealerships(request, state="All"):
+
+    if(state == "All"):
+
+        endpoint = "/fetchDealers"
+
+    else:
+
+        endpoint = "/fetchDealers/" + state
+
+    dealerships = get_request(endpoint)
+
+    return JsonResponse({
+        "status": 200,
+        "dealers": dealerships
+    })
+
+
+# ---------------------------------
+# GET DEALER DETAILS
+# ---------------------------------
+def get_dealer_details(request, dealer_id):
+
+    if(dealer_id):
+
+        endpoint = "/fetchDealer/" + str(dealer_id)
+
+        dealership = get_request(endpoint)
+
+        return JsonResponse({
+            "status": 200,
+            "dealer": dealership
+        })
+
+    else:
+
+        return JsonResponse({
+            "status": 400,
+            "message": "Bad Request"
+        })
+
+
+# ---------------------------------
+# GET DEALER REVIEWS
+# ---------------------------------
+def get_dealer_reviews(request, dealer_id):
+
+    if(dealer_id):
+
+        endpoint = "/fetchReviews/dealer/" + str(dealer_id)
+
+        reviews = get_request(endpoint)
+
+        for review_detail in reviews:
+
+            response = analyze_review_sentiments(review_detail['review'])
+
+            review_detail['sentiment'] = response['sentiment']
+
+        return JsonResponse({
+            "status": 200,
+            "reviews": reviews
+        })
+
+    else:
+
+        return JsonResponse({
+            "status": 400,
+            "message": "Bad Request"
+        })
