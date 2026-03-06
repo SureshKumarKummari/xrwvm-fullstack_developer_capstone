@@ -1,17 +1,11 @@
 # Uncomment the required imports before adding the code
 
-from django.shortcuts import render
-from django.http import HttpResponseRedirect, HttpResponse
-from django.contrib.auth.models import User
-from django.shortcuts import get_object_or_404, render, redirect
-from django.contrib.auth import logout
-from django.contrib import messages
-from datetime import datetime
-
-from django.http import JsonResponse
-from django.contrib.auth import login, authenticate
-import logging
 import json
+import logging
+
+from django.contrib.auth import authenticate, login, logout
+from django.contrib.auth.models import User
+from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 
 from .models import CarMake, CarModel
@@ -21,11 +15,13 @@ from .restapis import get_request, analyze_review_sentiments, post_review
 # ---------------------------------
 # GET CARS
 # ---------------------------------
+
+
 def get_cars(request):
 
     count = CarMake.objects.filter().count()
 
-    if(count == 0):
+    if count == 0:
         initiate()
 
     car_models = CarModel.objects.select_related('car_make')
@@ -89,8 +85,6 @@ def logout_request(request):
 @csrf_exempt
 def registration(request):
 
-    context = {}
-
     data = json.loads(request.body)
 
     username = data['userName']
@@ -107,7 +101,7 @@ def registration(request):
 
         username_exist = True
 
-    except:
+    except User.DoesNotExist:
 
         logger.debug("{} is new user".format(username))
 
@@ -139,7 +133,7 @@ def registration(request):
 # ---------------------------------
 def get_dealerships(request, state="All"):
 
-    if(state == "All"):
+    if state == "All":
 
         endpoint = "/fetchDealers"
 
@@ -160,7 +154,7 @@ def get_dealerships(request, state="All"):
 # ---------------------------------
 def get_dealer_details(request, dealer_id):
 
-    if(dealer_id):
+    if dealer_id:
 
         endpoint = "/fetchDealer/" + str(dealer_id)
 
@@ -184,17 +178,23 @@ def get_dealer_details(request, dealer_id):
 # ---------------------------------
 def get_dealer_reviews(request, dealer_id):
 
-    if(dealer_id):
+    if dealer_id:
 
         endpoint = "/fetchReviews/dealer/" + str(dealer_id)
 
         reviews = get_request(endpoint)
 
+        if not isinstance(reviews, list):
+            logger.warning("Unexpected reviews payload: %r", reviews)
+            reviews = []
+
         for review_detail in reviews:
-
-            response = analyze_review_sentiments(review_detail['review'])
-
-            review_detail['sentiment'] = response['sentiment']
+            try:
+                response = analyze_review_sentiments(review_detail.get('review', ''))
+                review_detail['sentiment'] = response.get('sentiment', 'neutral')
+            except Exception as err:
+                logger.exception("Error analyzing sentiment: %s", err)
+                review_detail['sentiment'] = 'neutral'
 
         return JsonResponse({
             "status": 200,
@@ -211,7 +211,7 @@ def get_dealer_reviews(request, dealer_id):
 @csrf_exempt
 def add_review(request):
 
-    if(request.user.is_anonymous == False):
+    if not request.user.is_anonymous:
 
         data = json.loads(request.body)
 
@@ -221,7 +221,8 @@ def add_review(request):
 
             return JsonResponse({"status": 200})
 
-        except:
+        except Exception as err:
+            logger.exception("Error posting review: %s", err)
 
             return JsonResponse({
                 "status": 401,

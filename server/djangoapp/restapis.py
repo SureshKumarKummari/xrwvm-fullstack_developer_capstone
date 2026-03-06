@@ -2,6 +2,7 @@
 import requests
 import os
 from dotenv import load_dotenv
+from urllib.parse import quote
 
 load_dotenv()
 
@@ -21,7 +22,7 @@ def get_request(endpoint, **kwargs):
 
     params = ""
 
-    if(kwargs):
+    if kwargs:
         for key, value in kwargs.items():
             params = params + key + "=" + value + "&"
 
@@ -33,8 +34,8 @@ def get_request(endpoint, **kwargs):
         response = requests.get(request_url)
         return response.json()
 
-    except:
-        print("Network exception occurred")
+    except requests.RequestException as err:
+        print(f"Network exception occurred: {err}")
 
 
 # ----------------------------------------
@@ -42,15 +43,15 @@ def get_request(endpoint, **kwargs):
 # ----------------------------------------
 def analyze_review_sentiments(text):
 
-    request_url = sentiment_analyzer_url + "analyze/" + text
+    request_url = sentiment_analyzer_url + "analyze/" + quote(text, safe="")
 
     try:
-        response = requests.get(request_url)
+        response = requests.get(request_url, timeout=5)
         return response.json()
 
-    except Exception as err:
-        print(f"Unexpected {err=}, {type(err)=}")
-        print("Network exception occurred")
+    except (requests.RequestException, ValueError) as err:
+        print(f"Sentiment analyzer error: {err}")
+        return {"sentiment": "neutral"}
 
 
 # ----------------------------------------
@@ -67,5 +68,5 @@ def post_review(data_dict):
 
         return response.json()
 
-    except:
-        print("Network exception occurred")
+    except requests.RequestException as err:
+        print(f"Network exception occurred: {err}")
