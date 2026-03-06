@@ -190,8 +190,12 @@ def get_dealer_reviews(request, dealer_id):
 
         for review_detail in reviews:
             try:
-                response = analyze_review_sentiments(review_detail.get('review', ''))
-                review_detail['sentiment'] = response.get('sentiment', 'neutral')
+                response = analyze_review_sentiments(
+                    review_detail.get('review', '')
+                )
+                review_detail['sentiment'] = response.get(
+                    'sentiment', 'neutral'
+                )
             except Exception as err:
                 logger.exception("Error analyzing sentiment: %s", err)
                 review_detail['sentiment'] = 'neutral'
@@ -207,6 +211,7 @@ def get_dealer_reviews(request, dealer_id):
             "status": 400,
             "message": "Bad Request"
         })
+
 
 @csrf_exempt
 def add_review(request):
